@@ -1,0 +1,287 @@
+\documentclass{article}
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{url}
+\geometry{margin=2.5cm}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    columns=fullflexible,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray}
+}
+
+\title{Práctica 3: Selección de Características}
+\author{Dra. María Elena Martínez Pérez \\
+M. en C. Miguel Ángel Veloz Lucas}
+\date{8 de abril de 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Objetivos}
+\begin{itemize}
+    \item Implementar diferentes métodos de selección de características.
+    \item Comparar resultados entre distintos métodos de selección de características.
+    \item Analizar el impacto de la reducción dimensional en un problema de clasificación multiclase.
+\end{itemize}
+
+\section{Introducción}
+
+La selección de características es fundamental en reconocimiento de patrones y aprendizaje automático. Su propósito es identificar los atributos más informativos de un conjunto de datos, descartando variables redundantes, irrelevantes o ruidosas. Esto puede reducir el costo computacional, mejorar la interpretabilidad del modelo y disminuir el riesgo de sobreajuste.
+
+En problemas de alta dimensionalidad, como datos biomédicos o señales electrocardiográficas, muchas variables pueden estar correlacionadas o aportar información repetida. Por ello, métodos como la búsqueda secuencial hacia delante (SFS), Fisher Score y el análisis de componentes principales (PCA) permiten estudiar distintas formas de reducir la dimensionalidad. SFS evalúa combinaciones de características, Fisher Score mide la separabilidad individual de cada variable y PCA transforma los datos hacia un espacio de componentes ortogonales que concentran la varianza.
+
+\section{Desarrollo}
+
+\subsection{Conjunto de datos}
+
+Se utilizó el conjunto de datos \textit{Arrhythmia} del UCI Machine Learning Repository. Este conjunto contiene 452 registros y 280 columnas: 279 atributos de entrada y una columna objetivo llamada \texttt{Class}. El objetivo es clasificar señales de electrocardiograma en diferentes tipos de arritmia. En los datos cargados se encontraron 13 clases presentes: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 14, 15 y 16.
+
+La distribución original de clases mostró un desbalance importante. Por ejemplo, la clase 1 contiene 245 muestras, mientras que la clase 8 contiene únicamente 2 muestras. Este desbalance justificó el uso de sobremuestreo en el conjunto de entrenamiento.
+
+\subsection{Preparación de datos}
+
+Primero se cargó el archivo \texttt{arrhythmia.data} indicando que el símbolo \texttt{?} debía tratarse como valor faltante. Los valores faltantes detectados fueron:
+
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+Columna & Valores faltantes \\
+\midrule
+\texttt{T\_vector\_angle} & 8 \\
+\texttt{P\_vector\_angle} & 22 \\
+\texttt{QRST\_vector\_angle} & 1 \\
+\texttt{J\_vector\_angle} & 376 \\
+\texttt{Heart\_rate} & 1 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+La columna \texttt{J\_vector\_angle} fue eliminada porque tenía 376 valores faltantes, equivalentes aproximadamente al 83\% de los registros. Las demás columnas con valores faltantes se imputaron usando la mediana, ya que esta medida es más robusta ante valores atípicos que la media.
+
+Después de la limpieza, se separaron las características y la variable objetivo:
+
+\begin{lstlisting}[language=Python]
+X = df_cleaned.drop(columns=['Class'])
+y = df_cleaned['Class']
+\end{lstlisting}
+
+Los datos se dividieron en 80\% entrenamiento y 20\% prueba mediante una partición estratificada. El conjunto de entrenamiento quedó con 361 muestras y el conjunto de prueba con 91 muestras.
+
+\subsection{Escalamiento}
+
+Se aplicó \texttt{RobustScaler} únicamente a las características numéricas continuas. Este escalador usa la mediana y el rango intercuartílico (IQR), por lo que mitiga el efecto de muestras atípicas. Las variables binarias, indicadoras o constantes codificadas como 0/1, por ejemplo \texttt{Sex}, \texttt{ragged\_*} y \texttt{diphasic\_*}, se conservaron sin escalar para mantener su interpretación original.
+
+El tratamiento final fue:
+
+\begin{itemize}
+    \item 197 columnas continuas escaladas con \texttt{RobustScaler}.
+    \item 81 columnas binarias/indicadoras conservadas sin escalar.
+    \item 278 columnas predictoras después de eliminar \texttt{J\_vector\_angle}.
+\end{itemize}
+
+\subsection{Corrección del desbalanceo}
+
+Se utilizó \texttt{RandomOverSampler} únicamente sobre el conjunto de entrenamiento. Esta técnica duplica aleatoriamente muestras de las clases minoritarias hasta igualar el número de registros de la clase mayoritaria. En el entrenamiento, cada clase quedó con 196 registros después del sobremuestreo.
+
+El conjunto de prueba no fue sobremuestreado, para mantener una evaluación realista del desempeño del modelo.
+
+\subsection{Validación cruzada}
+
+Se utilizó validación cruzada estratificada manteniendo separado el conjunto de prueba. Debido a que la clase menos frecuente en el conjunto de entrenamiento original tenía solo 2 muestras, el número de folds efectivos se ajustó a 2. Esto evita errores en \texttt{StratifiedKFold}, ya que no se pueden repartir menos muestras reales que el número de folds solicitado.
+
+Durante la validación cruzada, el sobremuestreo se aplicó solamente dentro del fold de entrenamiento. El fold de validación se mantuvo sin sobremuestrear para evitar fuga de información.
+
+\subsection{Modelo base}
+
+Para comparar los métodos de selección y reducción de características se utilizó \texttt{RandomForestClassifier}. Este modelo puede capturar relaciones no lineales e interacciones entre variables, lo cual es útil en datos tabulares con características clínicas y electrocardiográficas. Además, se usó \texttt{class\_weight="balanced"} como apoyo adicional ante el desbalance de clases.
+
+\section{Implementación de Métodos}
+
+\subsection{Búsqueda Secuencial hacia delante (SFS)}
+
+La búsqueda secuencial hacia delante se implementó agregando en cada paso la característica que más incrementaba el criterio multivariado de separabilidad de Fisher. El proceso se detuvo al alcanzar un máximo de 20 características o cuando el puntaje Fisher no mejoró durante 3 iteraciones consecutivas.
+
+En cada fold de validación cruzada, SFS se ejecutó solo con los datos de entrenamiento del fold. Posteriormente se entrenó el modelo con las características seleccionadas y se evaluó en el fold de validación. El ajuste final seleccionó 20 características, entre ellas:
+
+\begin{itemize}
+    \item \texttt{V3\_Q\_wave\_width}
+    \item \texttt{V6\_R\_wave\_width}
+    \item \texttt{V4\_QRSA}
+    \item \texttt{PR\_interval}
+    \item \texttt{V3\_diphasic\_P\_wave}
+    \item \texttt{Sex}
+\end{itemize}
+
+El resultado en prueba para SFS fue:
+
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+Métrica & Valor \\
+\midrule
+Exactitud & 0.5824 \\
+Precisión macro & 0.2413 \\
+Recall macro & 0.2758 \\
+F1 macro & 0.2323 \\
+Tiempo & 18.6947 s \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Fisher Score}
+
+El método Fisher Score evaluó cada característica de forma individual mediante la razón entre dispersión interclase e intraclase. Después se seleccionaron las 20 características con mayor puntuación. Las principales características seleccionadas fueron:
+
+\begin{itemize}
+    \item \texttt{V3\_Q\_wave\_width}
+    \item \texttt{DI\_R\_wave\_width}
+    \item \texttt{V6\_R\_wave\_width}
+    \item \texttt{V3\_S\_wave\_width}
+    \item \texttt{V2\_JJ\_wave\_amplitude}
+    \item \texttt{PR\_interval}
+    \item \texttt{Heart\_rate}
+\end{itemize}
+
+El resultado en prueba para Fisher fue:
+
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+Métrica & Valor \\
+\midrule
+Exactitud & 0.6154 \\
+Precisión macro & 0.2478 \\
+Recall macro & 0.3116 \\
+F1 macro & 0.2644 \\
+Tiempo & 2.0093 s \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{PCA}
+
+Antes de aplicar PCA se removieron pares de características altamente correlacionadas con coeficiente absoluto mayor a 0.9. De las 278 características originales, se eliminaron 31 por alta correlación y se conservaron 247 para PCA.
+
+Después, PCA determinó el número de componentes necesario para explicar al menos el 95\% de la varianza. El ajuste final requirió 14 componentes principales.
+
+El resultado en prueba para PCA fue:
+
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+Métrica & Valor \\
+\midrule
+Exactitud & 0.5934 \\
+Precisión macro & 0.2672 \\
+Recall macro & 0.3420 \\
+F1 macro & 0.2924 \\
+Tiempo & 3.1073 s \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Análisis Comparativo}
+
+\begin{center}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{lrrrrrrr}
+\toprule
+Método & Variables/Comp. & Acc. CV & Std. CV & Acc. prueba & Prec. macro & Recall macro & F1 macro \\
+\midrule
+Fisher & 20 & 0.6094 & 0.0017 & 0.6154 & 0.2478 & 0.3116 & 0.2644 \\
+PCA & 14 & 0.5540 & 0.0206 & 0.5934 & 0.2672 & 0.3420 & 0.2924 \\
+SFS & 20 & 0.5679 & 0.0043 & 0.5824 & 0.2413 & 0.2758 & 0.2323 \\
+\bottomrule
+\end{tabular}
+}
+\end{center}
+
+El método con mayor exactitud en el conjunto de prueba fue Fisher Score, con una exactitud de 0.6154. También fue el método más estable en validación cruzada, pues obtuvo la menor desviación estándar entre folds (0.0017). PCA obtuvo el mejor F1 macro (0.2924), lo que sugiere que, aunque su exactitud fue menor que la de Fisher, tuvo un mejor equilibrio promedio entre clases.
+
+SFS obtuvo una exactitud menor y fue el método con mayor tiempo de cómputo. Esto es esperado, ya que evalúa subconjuntos de características de manera secuencial y el cálculo multivariado de Fisher requiere más operaciones que el Fisher Score univariado.
+
+\section{Análisis de resultados}
+
+\subsection*{¿Qué método obtuvo mejor exactitud? ¿Por qué?}
+
+El método con mejor exactitud fue Fisher Score, con 0.6154 en el conjunto de prueba. Esto puede explicarse porque varias características individuales del ECG presentaron alta separabilidad entre clases. Al seleccionar las 20 variables con mayor relación entre dispersión interclase e intraclase, Fisher conservó información discriminante suficiente sin introducir tanta complejidad.
+
+\subsection*{¿Qué método es más robusto ante outliers y desbalanceo?}
+
+El preprocesamiento más robusto ante outliers fue el escalamiento con \texttt{RobustScaler}, ya que utiliza mediana e IQR. Respecto al desbalanceo, la robustez provino del uso de \texttt{RandomOverSampler} en entrenamiento y de \texttt{class\_weight="balanced"} en el modelo Random Forest. Entre los métodos comparados, Fisher fue el más estable según la desviación estándar de validación cruzada.
+
+\subsection*{¿Cómo afecta la correlación entre características al PCA?}
+
+La correlación alta entre características puede provocar redundancia: varias variables contienen información muy similar. PCA combina variables correlacionadas en componentes principales, pero si hay demasiada redundancia, algunas características pueden aportar poca información nueva. Por ello se removieron pares con correlación mayor a 0.9 antes de aplicar PCA. Esto redujo la dimensionalidad de 278 a 247 características antes de obtener los componentes principales.
+
+\subsection*{¿Qué ventajas tiene Fisher Score sobre SFS en términos computacionales?}
+
+Fisher Score es más eficiente porque evalúa cada característica por separado una sola vez y después ordena los puntajes. En cambio, SFS evalúa múltiples subconjuntos de características en cada iteración, lo cual aumenta considerablemente el costo computacional. En los resultados obtenidos, Fisher tardó 2.0093 segundos, mientras que SFS tardó 18.6947 segundos.
+
+\section{Código}
+
+El código completo se encuentra en el cuaderno de Python \texttt{Practica\_3\_Seleccion\_de\_Caracteristicas\_completada.ipynb}. A continuación se muestran los fragmentos principales.
+
+\subsection*{Escalamiento de variables continuas}
+\begin{lstlisting}[language=Python]
+numerical_cols = X.select_dtypes(include=['int64', 'float64']).columns
+binary_cols = [
+    col for col in numerical_cols
+    if X[col].nunique(dropna=True) <= 2
+    and set(X[col].dropna().unique()).issubset({0, 1})
+]
+continuous_cols = [col for col in numerical_cols if col not in binary_cols]
+
+scaler = RobustScaler()
+X_train[continuous_cols] = scaler.fit_transform(X_train[continuous_cols])
+X_test[continuous_cols] = scaler.transform(X_test[continuous_cols])
+\end{lstlisting}
+
+\subsection*{Sobremuestreo por fold}
+\begin{lstlisting}[language=Python]
+def oversample_fold(X_fold_train, y_fold_train):
+    ros_fold = RandomOverSampler(random_state=42)
+    X_bal, y_bal = ros_fold.fit_resample(X_fold_train, y_fold_train)
+    return np.asarray(X_bal), np.asarray(y_bal)
+\end{lstlisting}
+
+\subsection*{Modelo base}
+\begin{lstlisting}[language=Python]
+modelo_base = RandomForestClassifier(
+    n_estimators=300,
+    random_state=42,
+    class_weight="balanced",
+    n_jobs=-1
+)
+\end{lstlisting}
+
+\section{Conclusiones}
+
+En esta práctica se implementaron y compararon tres métodos de selección o reducción de características aplicados al conjunto de datos de arritmias. Se observó que el preprocesamiento fue una etapa crítica debido a la presencia de valores faltantes, clases desbalanceadas, variables continuas, variables binarias y valores atípicos.
+
+Fisher Score obtuvo la mejor exactitud en prueba y la mayor estabilidad en validación cruzada. PCA obtuvo el mejor F1 macro, lo que indica un mejor balance promedio entre clases, aunque con menor exactitud que Fisher. SFS permitió evaluar subconjuntos de características, pero tuvo mayor costo computacional y no superó a Fisher en este experimento.
+
+Finalmente, el uso de \texttt{RobustScaler}, \texttt{RandomOverSampler}, validación cruzada estratificada y un conjunto de prueba separado permitió realizar una comparación más controlada entre métodos, evitando que los datos de prueba influyeran en la selección de características o en el ajuste del modelo.
+
+\section{Referencias}
+
+\begin{itemize}
+    \item Guvenir, H., Acar, B., Muderrisoglu, H., \& Quinlan, R. (1997). Arrhythmia. UCI Machine Learning Repository. \url{https://doi.org/10.24432/C5BS32}.
+    \item Golub, T. R., Slonim, D. K., Tamayo, P., Huard, C., Gaasenbeek, M., Mesirov, J. P., Coller, H., Loh, M. L., Downing, J. R., Caligiuri, M. A., Bloomfield, C. D., \& Lander, E. S. (1999). Molecular classification of cancer: class discovery and class prediction by gene expression monitoring. Science, 286, 531--537.
+    \item Sánchez Garreta, J. S., \& García, V. (2022). Special Issue on Data Preprocessing in Pattern Recognition: Recent Progress, Trends and Applications.
+    \item Pedregosa, F. et al. (2011). Scikit-learn: Machine Learning in Python. Journal of Machine Learning Research, 12, 2825--2830.
+\end{itemize}
+
+\end{document}
