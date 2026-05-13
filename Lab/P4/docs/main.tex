@@ -5,6 +5,7 @@
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage{hyperref}
+\usepackage{array}
 % \documentclass{article}
 % \usepackage[english]{babel} % To obtain English text with the blindtext package
 % \usepackage{blindtext}
@@ -61,49 +62,150 @@ Estos modelos, inspirados en el cerebro humano, destacan por su capacidad para a
 \textbf{Ejercicio: Aplicación y comparación de clasificadores.}
 \end{large}
 \\\\
-Selecciona tres conjuntos de datos para entrenar distintos modelos de clasificación variando la configuración de sus hiperparámetros.
+Selecciona tres conjuntos de datos para entrenar distintos modelos de clasificación variando la configuración de sus hiperparámetros. En el desarrollo del notebook se trabajó con dos conjuntos de datos: \textit{Breast Cancer Wisconsin Diagnostic} y \textit{Parkinsons Telemonitoring}. El primero es un problema de clasificación binaria y el segundo fue adaptado de regresión a clasificación mediante la creación de una variable de severidad.
 \\\\
- Conjunto de datos propuesto:
+Conjunto de datos propuesto:
 \begin{itemize}
     \item Clasificación Multimodelo para Cáncer de Mama ( \href{https://archive.ics.uci.edu/dataset/17/breast+cancer+wisconsin+diagnostic}{\textit{Breast Cancer Wisconsin Diagnostic}}): Conjunto de datos biomédicos que contiene características numéricas derivadas de imágenes digitales de aspiraciones con aguja fina (FNA) de masas mamarias, utilizadas para clasificar tumores como benignos o malignos.
-    \item Detección Temprana de Parkinson, voz y biomarcadores acústicos (\href{https://archive.ics.uci.edu/dataset/189/parkinsons+telemonitoring}{\textit{Breast Parkinsons Telemonitoring}}): Es un conjunto de datos diseñado para apoyar la investigación en el diagnóstico del enfermedad de Parkinson. Contiene medidas biomédicas de voz obtenidas de personas sanas y pacientes con la enfermedad, con el objetivo de diferenciar entre ambos grupos mediante técnicas de aprendizaje automático.
-    \item Clasificación de Cardiopatía (\href{https://archive.ics.uci.edu/dataset/45/heart+disease}{ \textit{Heart Disease}}): Este conjunto de datos recopila información de pacientes para determinar la probabilidad de enfermedad cardíaca, codificada en una variable objetivo que indica la presencia o ausencia de la condición. Entre las variables predictoras se incluyen edad, sexo, presión arterial en reposo, nivel de colesterol, frecuencia cardíaca máxima y resultados de pruebas electrocardiográficas.
-    \item Verificador de síntomas de COVID-19 (\href{https://www.kaggle.com/datasets/iamhungundji/covid19-symptoms-checker}{\textit{COVID Symptom Classification Dataset}}): Los datos identifican si una persona padece o no la enfermedad del coronavirus, basándose en algunos síntomas estándar predefinidos. Dichos síntomas se basan en las directrices de la Organización Mundial de la Salud (OMS) y del Ministerio de Salud y Bienestar Familiar de la India.    
-\end{itemize} 
+    \item Detección Temprana de Parkinson, voz y biomarcadores acústicos (\href{https://archive.ics.uci.edu/dataset/189/parkinsons+telemonitoring}{\textit{Parkinsons Telemonitoring}}): Conjunto de datos con medidas biomédicas de voz y variables clínicas UPDRS. Aunque originalmente está orientado a regresión, se transformó a clasificación mediante clases de severidad.
+\end{itemize}
 
-\\\\
 \begin{enumerate}
-  \item \textbf{Carga y análisis de datos:} 
+  \item \textbf{Carga y análisis de datos:}
     \begin{enumerate}
       \item Cargar el conjunto de datos.
+
+      Breast Cancer contiene 569 registros y 32 columnas. La variable objetivo es \texttt{diagnosis}, con clases \texttt{B} para benigno y \texttt{M} para maligno. Parkinsons contiene 5875 registros y 22 columnas. Como este conjunto contiene originalmente \texttt{motor\_UPDRS} y \texttt{total\_UPDRS} como variables continuas, se creó la clase \texttt{updrs\_severity} a partir de terciles de \texttt{total\_UPDRS}. Posteriormente, \texttt{motor\_UPDRS}, \texttt{total\_UPDRS} y \texttt{subject\#} se excluyeron de las variables predictoras para evitar fuga de información.
+
+      \begin{table}[h!]
+      \centering
+      \resizebox{\linewidth}{!}{%
+      \begin{tabular}{|l|r|l|l|}
+      \hline
+      \textbf{Dataset} & \textbf{Dimensiones} & \textbf{Variable objetivo} & \textbf{Clases} \\
+      \hline
+      Breast Cancer & 569 x 32 & \texttt{diagnosis} & \texttt{B}, \texttt{M} \\
+      Parkinsons & 5875 x 22 & \texttt{updrs\_severity} & \texttt{low}, \texttt{medium}, \texttt{high} \\
+      \hline
+      \end{tabular}
+      }
+      \caption{Resumen de los conjuntos de datos utilizados.}
+      \end{table}
+
       \item Visualización de la distribución de clases.
+
+      Breast Cancer presentó 357 casos benignos y 212 malignos, por lo que existe un desbalance moderado. Parkinsons quedó prácticamente balanceado después de construir las clases por terciles: 1961 casos \texttt{low}, 1956 \texttt{medium} y 1958 \texttt{high}.
+
+      \begin{table}[h!]
+      \centering
+      \begin{tabular}{|l|r|}
+      \hline
+      \textbf{Clase} & \textbf{Frecuencia} \\
+      \hline
+      Breast Cancer B & 357 \\
+      Breast Cancer M & 212 \\
+      Parkinsons low & 1961 \\
+      Parkinsons medium & 1956 \\
+      Parkinsons high & 1958 \\
+      \hline
+      \end{tabular}
+      \caption{Distribución de clases por conjunto de datos.}
+      \end{table}
+
+      \begin{figure}[h!]
+      \centering
+      \fbox{\parbox{0.82\linewidth}{\centering Placeholder de imagen: distribución de clases de Breast Cancer y Parkinsons.}}
+      \caption{Distribución de clases por conjunto de datos.}
+      \label{fig:class-distribution}
+      \end{figure}
+
       \item Análisis de valores faltantes (porcentaje de valores faltantes por columna).
-     
+
+      No se encontraron valores faltantes en ninguno de los dos conjuntos de datos. Por esta razón, no fue necesario imputar valores en la etapa de limpieza.
     \end{enumerate}
+
   \item \textbf{Preprocesamiento y limpieza:}
     \begin{enumerate}
-    \item Separación de tipos de variables (Identificamos columnas numéricas y categóricas).
-    \item Verificar y aplicar limpieza de datos (faltantes, \textit{outliers}, caracteres inválidos, etc.).
-    
+      \item Separación de tipos de variables (Identificamos columnas numéricas y categóricas).
+
+      En Breast Cancer se descartaron \texttt{id} y \texttt{diagnosis}; quedaron 30 variables numéricas como predictores. En Parkinsons se descartaron \texttt{subject\#}, \texttt{motor\_UPDRS}, \texttt{total\_UPDRS} y \texttt{updrs\_severity}; quedaron 19 variables numéricas.
+
+      \item Verificar y aplicar limpieza de datos (faltantes, \textit{outliers}, caracteres inválidos, etc.).
+
+      Dado que no había valores faltantes, no se aplicó imputación. Sí se detectaron valores atípicos mediante la regla IQR. En Breast Cancer destacaron \texttt{se\_area} (65), \texttt{se\_radius} (38), \texttt{se\_perimeter} (38), \texttt{worst\_area} (35) y \texttt{se\_smoothness} (30). En Parkinsons destacaron \texttt{NHR} (436), \texttt{Jitter:PPQ5} (425), \texttt{Jitter:RAP} (414), \texttt{Jitter:DDP} (413) y \texttt{Jitter(\%)} (398).
+
+      \begin{figure}[h!]
+      \centering
+      \fbox{\parbox{0.82\linewidth}{\centering Placeholder de imagen: barras con variables con más \textit{outliers} por IQR.}}
+      \caption{Variables con mayor cantidad de valores atípicos detectados por IQR.}
+      \label{fig:outliers}
+      \end{figure}
+
       \item Estandarización de características (escaladores).
+
+      Se utilizó \texttt{RobustScaler} en ambos conjuntos, ya que este escalador usa mediana y rango intercuartílico, lo cual reduce la influencia de valores extremos frente a \texttt{StandardScaler}.
+
       \item Separación en 70\% entrenamiento y 30\% prueba.
-      \item Manejo del desbalance de clases  sobre el conjunto de entrenamiento (por ejemplo SMOTE, ADASYN o Sobremuestreo aleatorio).
-      \item Visualización  de la distribución.
+
+      La división fue estratificada. Breast Cancer quedó con 398 registros de entrenamiento y 171 de prueba. En entrenamiento tuvo 250 casos \texttt{B} y 148 \texttt{M}. Parkinsons quedó con 4112 registros de entrenamiento y 1763 de prueba. En entrenamiento tuvo 1373 casos \texttt{low}, 1370 \texttt{high} y 1369 \texttt{medium}.
+
+      \item Manejo del desbalance de clases sobre el conjunto de entrenamiento (por ejemplo SMOTE, ADASYN o Sobremuestreo aleatorio).
+
+      Para Breast Cancer se aplicó SMOTE porque la razón minoría/mayoría fue 0.592; la clase maligna pasó de 148 a 250 muestras en entrenamiento. En Parkinsons no se aplicó SMOTE porque las clases quedaron prácticamente balanceadas, con razón minoría/mayoría de 0.997.
+
+      \item Visualización de la distribución.
+
+      La distribución posterior al manejo de desbalance se verificó para confirmar el balance aplicado en Breast Cancer y la conservación de clases en Parkinsons.
     \end{enumerate}
- \item \textbf{Reducción de dimensionalidad por análisis de componentes principales (PCA):}
+
+  \item \textbf{Reducción de dimensionalidad por análisis de componentes principales (PCA):}
     \begin{enumerate}
         \item Aplicar PCA a los datos balanceados.
+
+        PCA se aplicó después del escalado robusto. En Breast Cancer se usaron los datos con SMOTE dentro del flujo de entrenamiento; en Parkinsons se usaron los datos sin remuestreo.
+
         \item Cálculo de la varianza acumulada.
+
+        En Breast Cancer, el primer componente explicó 44.59\% de la varianza y los dos primeros 64.69\%. En Parkinsons, el primer componente explicó 77.73\% y los dos primeros 86.94\%.
+
         \item Encontrar el número de componentes para el 95\% de varianza.
+
+        Breast Cancer necesitó 10 componentes para alcanzar 0.9591 de varianza acumulada. Parkinsons necesitó 6 componentes para alcanzar 0.9598.
+
+        \begin{table}[h!]
+        \centering
+        \begin{tabular}{|l|r|r|}
+        \hline
+        \textbf{Dataset} & \textbf{Componentes} & \textbf{Varianza acumulada} \\
+        \hline
+        Breast Cancer & 10 & 0.9591 \\
+        Parkinsons & 6 & 0.9598 \\
+        \hline
+        \end{tabular}
+        \caption{Componentes necesarios para conservar al menos el 95\% de la varianza.}
+        \end{table}
+
         \item Gráfico del número de componentes principales y varianza acumulada.
+
+        \begin{figure}[h!]
+        \centering
+        \fbox{\parbox{0.82\linewidth}{\centering Placeholder de imagen: curvas de varianza acumulada PCA para ambos conjuntos.}}
+        \caption{Varianza acumulada en función del número de componentes principales.}
+        \label{fig:pca-variance}
+        \end{figure}
     \end{enumerate}
 
 \item \textbf{Definición de modelos, esquema de trabajo y búsqueda en cuadrícula (grid search):}
-\begin{enumerate}
-    \item Desarrollar un esquema de funciones (\textit{pipelines} ) que integren el preprocesamiento y el clasificador.
-\item La búsqueda en cuadrícula nos permitirá encontrar los mejores hiperparámetros. Este método consiste en especificar una lista de posibles valores para cada hiperparámetro y luego entrenar el modelo para cada combinación de estos valores. Se evalúa el rendimiento de cada modelo y se selecciona la combinación de hiperparámetros que da el mejor rendimiento. Este método es exhaustivo y puede resultar computacionalmente costoso, especialmente cuando se trata con un gran número de hiperparámetros o un gran número de datos.
-\end{enumerate}
-    
+    \begin{enumerate}
+        \item Desarrollar un esquema de funciones (\textit{pipelines}) que integren el preprocesamiento y el clasificador.
+
+        Se construyeron \textit{pipelines} con escalado robusto, manejo de desbalance cuando correspondía, PCA y clasificador. Los modelos evaluados fueron KNN, árbol de decisión y SVM.
+
+        \item La búsqueda en cuadrícula nos permitirá encontrar los mejores hiperparámetros.
+
+        La búsqueda se realizó con \texttt{GridSearchCV}, validación cruzada de 3 pliegues y métrica \texttt{f1\_macro}. Esta métrica fue elegida porque pondera por igual el desempeño de todas las clases.
+    \end{enumerate}
+
   \item \textbf{Configuración de modelos y cuadro de hiperparámetros}
     \begin{enumerate}
       \item Modelo de KNN:
@@ -111,66 +213,115 @@ Selecciona tres conjuntos de datos para entrenar distintos modelos de clasificac
           \item vecinos (1,3,5,7,9).
           \item pesos (\textit{weights: ['uniform', 'distance']}).
           \item distancia (\textit{metric:['euclidean', 'manhattan']}).
-      \end{itemize} 
-      \item Modelo de árbol de decisión  
+      \end{itemize}
+
+      En Breast Cancer el mejor KNN usó distancia Manhattan, 7 vecinos y pesos uniformes. En Parkinsons el mejor KNN usó distancia Manhattan, 9 vecinos y pesos por distancia.
+
+      \item Modelo de árbol de decisión
       \begin{itemize}
           \item profundidad ( \textit{[3, 5, 7, None]}).
           \item número mínimo de muestras por división (\textit{samples split: [2, 5, 10]}).
           \item criterio de división (\textit{criterion': ['gini', 'entropy']}).
+          \item peso de clases (\textit{class\_weight: [None, 'balanced']}).
       \end{itemize}
 
-      \item Modelo de SVM  
+      En Breast Cancer el mejor árbol usó criterio \textit{entropy}, profundidad 5, \texttt{min\_samples\_split=10} y sin ponderación de clases. En Parkinsons el mejor árbol usó \textit{entropy}, profundidad sin límite, \texttt{min\_samples\_split=10} y \texttt{class\_weight='balanced'}.
+
+      \item Modelo de SVM
       \begin{itemize}
           \item kernel ( \textit{['linear', 'rbf']}).
           \item Regularización C (0.1, 1, 10).
           \item Gamma (\textit{['scale', 'auto', 0.01, 0.1]}).
+          \item peso de clases (\textit{class\_weight: [None, 'balanced']}).
       \end{itemize}
-  
+
+      En Breast Cancer el mejor SVM usó \textit{kernel} RBF, \texttt{C=1}, \texttt{gamma=scale} y sin ponderación de clases. En Parkinsons el mejor SVM usó \textit{kernel} RBF, \texttt{C=10}, \texttt{gamma=auto} y sin ponderación de clases.
     \end{enumerate}
-     \item \textbf{Entrenamiento, evaluación y comparación de resultados: }
+
+  \item \textbf{Entrenamiento, evaluación y comparación de resultados:}
     \begin{enumerate}
       \item Mejores métricas de rendimiento sobre conjunto de prueba por conjunto de datos.
+
+      \begin{table}[h!]
+      \centering
+      \resizebox{\linewidth}{!}{%
+      \begin{tabular}{|l|l|r|r|r|r|}
+      \hline
+      \textbf{Dataset} & \textbf{Modelo} & \textbf{F1 CV} & \textbf{Accuracy} & \textbf{Balanced acc.} & \textbf{F1 macro} \\
+      \hline
+      Breast Cancer & SVM & 0.9674 & 0.9942 & 0.9922 & 0.9937 \\
+      Breast Cancer & KNN & 0.9671 & 0.9825 & 0.9766 & 0.9811 \\
+      Breast Cancer & Árbol & 0.9304 & 0.9474 & 0.9360 & 0.9429 \\
+      Parkinsons & SVM & 0.6149 & 0.6557 & 0.6556 & 0.6526 \\
+      Parkinsons & KNN & 0.6339 & 0.6529 & 0.6528 & 0.6524 \\
+      Parkinsons & Árbol & 0.6373 & 0.6478 & 0.6478 & 0.6477 \\
+      \hline
+      \end{tabular}
+      }
+      \caption{Comparación de rendimiento en el conjunto de prueba.}
+      \end{table}
+
       \item Matriz de confusión de los modelos entrenados con las mejores métricas.
+
+      En Breast Cancer, SVM fue el mejor modelo y cometió únicamente un error relevante sobre prueba: un caso maligno fue clasificado como benigno. En Parkinsons, SVM también fue el mejor en prueba, pero la clase \texttt{medium} fue la más difícil de identificar.
+
+      \begin{figure}[h!]
+      \centering
+      \fbox{\parbox{0.82\linewidth}{\centering Placeholder de imagen: matrices de confusión para Breast Cancer y Parkinsons.}}
+      \caption{Matrices de confusión de los modelos entrenados.}
+      \label{fig:confusion}
+      \end{figure}
+
       \item Mostrar las fronteras de decisión superponiendo datos de entrenamiento y prueba.
+
+      \begin{figure}[h!]
+      \centering
+      \fbox{\parbox{0.82\linewidth}{\centering Placeholder de imagen: fronteras de decisión en PCA 2D para los mejores modelos.}}
+      \caption{Fronteras de decisión usando dos componentes principales.}
+      \label{fig:decision-boundaries}
+      \end{figure}
+
       \item Mostrar el árbol entrenado con los mejores parámetros.
+
+      \begin{figure}[h!]
+      \centering
+      \fbox{\parbox{0.82\linewidth}{\centering Placeholder de imagen: primeros niveles del árbol de decisión entrenado.}}
+      \caption{Árbol de decisión entrenado con los mejores hiperparámetros.}
+      \label{fig:tree-placeholder}
+      \end{figure}
+
       \item Comparar exactitud entre modelos.
+
+      En Breast Cancer, SVM obtuvo la mayor exactitud (0.9942), seguido por KNN (0.9825) y árbol de decisión (0.9474). En Parkinsons, SVM también obtuvo la mayor exactitud (0.6557), aunque KNN fue muy cercano (0.6529) y el árbol alcanzó 0.6478.
+
       \item ¿Qué hiperparámetro fue más relevante por modelo para cada conjunto de datos?
+
+      En Breast Cancer, los hiperparámetros más relevantes fueron \texttt{criterion} para árbol de decisión, \texttt{n\_neighbors} para KNN y \texttt{C} para SVM. En Parkinsons fueron \texttt{max\_depth} para árbol de decisión, \texttt{n\_neighbors} para KNN y \texttt{kernel} para SVM.
     \end{enumerate}
-
-    
-
 \end{enumerate}
 
 \bigskip
 
-
-%\section{Conclusión}
-%El descriptor LBP es eficaz para capturar patrones locales en texturas. Su implementación en MATLAB permite integrarse fácilmente en flujos de trabajo de reconocimiento de patrones.
-
 \section{Código}
-En esta sección deberás presentar el código fuente del programa que hayas escrito.
+Por indicación del reporte, no se incluye el código fuente en esta sección. El análisis, los experimentos y las salidas utilizadas para elaborar este documento se encuentran en el archivo \texttt{notebook.ipynb}.
+
 \section{Conclusiones}
-En esta sección deberás escribir las conclusiones a las que hayas llegado una vez terminada la práctica.
+
+La comparación entre clasificadores mostró comportamientos distintos para cada conjunto de datos. En Breast Cancer, todos los modelos lograron un desempeño alto, pero SVM fue el mejor con una exactitud de 0.9942 y F1 macro de 0.9937. Esto sugiere que las características geométricas extraídas de las imágenes FNA contienen información altamente discriminante para separar tumores benignos y malignos.
+
+En Parkinsons, el desempeño fue más moderado. El mejor modelo en prueba también fue SVM, con exactitud de 0.6557 y F1 macro de 0.6526. La dificultad principal apareció en la clase de severidad media, debido a que la etiqueta se generó a partir de cortes sobre una variable continua. Esta clase representa una zona intermedia donde las señales acústicas pueden solaparse con las clases baja y alta.
+
+El uso de \texttt{RobustScaler} fue adecuado porque ambos conjuntos presentaron valores atípicos. Además, SMOTE fue útil únicamente para Breast Cancer, donde sí existía desbalance de clases. Para Parkinsons no fue necesario, ya que la construcción por terciles produjo clases casi equivalentes. Finalmente, PCA permitió reducir la dimensionalidad conservando más del 95\% de la varianza: 10 componentes en Breast Cancer y 6 componentes en Parkinsons.
+
 \section{Referencias}
 
     \begin{itemize}
-        \item Tolstikhin, Ilya O., et al. \textit{Mlp-mixer: An all-mlp architecture for vision}. Advances in neural information processing systems 34 (2021): 24261-24272.
-        \item Wu, Baoyuan, et al. \textit{Defenses in adversarial machine learning: A survey}. arXiv preprint arXiv:2312.08890 (2023).
-        \item Liu, Xiao, et al. \textit{Self-supervised learning: Generative or contrastive}. IEEE transactions on knowledge and data engineering 35.1 (2021): 857-876.
-        \item Goodfellow, Ian. \textit{Deep learning.} (2016).
+        \item Wolberg, W., Mangasarian, O., Street, N., \& Street, W. (1993). \textit{Breast Cancer Wisconsin (Diagnostic)} [Dataset]. UCI Machine Learning Repository. \url{https://doi.org/10.24432/C5DW2B}.
+        \item Tsanas, A. \& Little, M. (2009). \textit{Parkinsons Telemonitoring} [Dataset]. UCI Machine Learning Repository. \url{https://doi.org/10.24432/C5ZS3N}.
+        \item Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., Blondel, M., Prettenhofer, P., Weiss, R., Dubourg, V., Vanderplas, J., Passos, A., Cournapeau, D., Brucher, M., Perrot, M., \& Duchesnay, E. (2011). Scikit-learn: Machine Learning in Python. \textit{Journal of Machine Learning Research}, 12, 2825--2830.
+        \item Lemaître, G., Nogueira, F., \& Aridas, C. K. (2017). Imbalanced-learn: A Python Toolbox to Tackle the Curse of Imbalanced Datasets in Machine Learning. \textit{Journal of Machine Learning Research}, 18(17), 1--5.
         \item Murphy, Kevin P. \textit{Machine learning: a probabilistic perspective}. MIT press, 2012.
-        \item Wolberg, W., Mangasarian, O., Street, N., & Street, W. (1993). Breast Cancer Wisconsin (Diagnostic) [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C5DW2B.
-        \item Tsanas, A. & Little, M. (2009). Parkinsons Telemonitoring [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C5ZS3N.
-        \item Janosi, A., Steinbrunn, W., Pfisterer, M., & Detrano, R. (1989). Heart Disease [Dataset]. UCI Machine Learning Repository. \\ https://doi.org/10.24432/C52P4X.
-        \item COVID Symptom Classification [Dataset]. (2021) Kaggle Repository \\ https://www.kaggle.com/datasets/iamhungundji/covid19-symptoms-checker.
-        
-        
     \end{itemize}
-
-\end{enumerate}
 
 
 \end{document}
-
-
-
