@@ -1,0 +1,164 @@
+\documentclass{article}
+\usepackage[english]{babel}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+% \documentclass{article}
+% \usepackage[english]{babel} % To obtain English text with the blindtext package
+% \usepackage{blindtext}
+
+\title{Practica 5: Agrupamiento y Clasificación}
+\author{Dra. María Elena Martínez Perez \\
+M. en C. Miguel Ángel Veloz Lucas}
+\date{27 de mayo de 2026}
+
+\begin{document}
+
+\maketitle
+\section{Reglas generales para el desarrollo de las Prácticas de Laboratorio}
+
+\begin{itemize}
+\item Deberás respetar la estructura general de este documento, i.e, entregar tu práctica con las secciones: objetivos, introducción, desarrollo, código, conclusiones y referencias.
+\item El desarrollo de la práctica deberá ser auténtico. Aquellos equipos que presenten los mismos cálculos, código fuente, etcétera, serán sancionados.
+\item El día de entrega establecido deberá ser respetado por todos los equipos. La hora límite de entrega es la hora de clase y no se reciben trabajos que sean terminados durante la hora de clase.
+\item  Deberás entregar el documento en el classroom antes de la fecha límite.
+\end{itemize}
+
+\section{Objetivos}
+
+    Esta práctica introduce el modelo de bolsa de palabras o \textit{Bag of Visual Words} (BoVW) para la clasificación de imágenes. El flujo de trabajo incluye:
+    \begin{itemize}        
+    \item Extraer descriptores SIFT de un conjunto de imágenes.
+    \item Construir un vocabulario visual aplicando k-means.
+    \item Representar cada imagen mediante un histograma normalizado de palabras visuales.
+    \item Clasificar las imágenes.
+    \item Evaluar el modelo con exactitud y matriz de confusión.
+    \item Experimentar con distintos parámetros (número de palabras, tipo de clasificador, etc.).      
+ 
+    
+\end{itemize}
+
+\section{Introducción}
+
+
+
+El reconocimiento de patrones en imágenes es un área fundamental de la visión por computadora. Uno de los enfoques más populares para la clasificación de escenas u objetos es el modelo \textit{Bag of Words} (BoVW), inspirado en el procesamiento de texto. En lugar de palabras, se utilizan \textit{palabras visuales} obtenidas a partir de descriptores locales de las imágenes. Este método es robusto frente a variaciones de escala, rotación e iluminación parcial.
+\subsection{Bolsa de palabras o Bag of Words en texto}
+El modelo (BoW) es ampliamente utilizado en procesamiento de lenguaje natural. Consiste en representar un documento como un vector de frecuencias de palabras de un vocabulario predefinido, ignorando el orden de las palabras pero preservando la información semántica relevante. Por ejemplo, si el vocabulario es \{\textit{perro}, \textit{gato}, \textit{ratón}\}, un documento con las palabras “gato gato perro” se representa como $[1,2,0]$.
+\\\\
+La clave del éxito de BoW es que palabras similares tienden a aparecer en contextos similares, y dos documentos con distribuciones de palabras parecidas probablemente tratan sobre el mismo tema.
+
+\subsection{Traslación al dominio visual: palabras visuales}
+De manera análoga, en el enfoque BoW se considera que una imagen es un “documento” compuesto por “palabras visuales”. Estas palabras no son objetos completos, sino \textbf{parches locales de la imagen} que han sido cuantificados en un vocabulario. El proceso típico consta de tres fases:
+
+\begin{enumerate}
+    \item \textbf{Extracción de descriptores locales}: Se detectan regiones de interés (por ejemplo, esquinas, bordes, texturas) y se calcula un descriptor numérico que resume la apariencia de cada región. Uno de los descriptores más potentes y ampliamente usados es \textbf{SIFT} (Scale-Invariant Feature Transform), desarrollado por David Lowe en 2004. SIFT es invariante a rotación y escala parcial, y robusto a cambios de iluminación. Cada descriptor es un vector de 128 números reales.
+    
+    \item \textbf{Construcción del vocabulario visual}: Se toman todos los descriptores extraídos de un conjunto de entrenamiento y se agrupan mediante un algoritmo de clustering, típicamente \textit{k-means}. Cada centroide resultante define una “palabra visual”. El número $k$ de palabras es un hiperparámetro crítico: valores pequeños producen palabras muy generales, valores grandes producen palabras muy específicas (riesgo de sobreajuste).
+    
+    \item \textbf{Representación de la imagen como histograma}: Para una imagen nueva, se extraen sus descriptores SIFT y cada uno se asigna a la palabra visual más cercana (en distancia euclídea). Se cuenta cuántas veces aparece cada palabra y se normaliza el histograma para que sume 1. Este histograma es el vector de características que se usará para la clasificación.
+\end{enumerate}
+
+\subsection{Ventajas del modelo BoW}
+\begin{itemize}
+    \item \textbf{Invariancia parcial}: Al depender de descriptores locales invariantes (SIFT), el modelo tolera cambios de escala, rotación y traslación de los objetos.
+    \item \textbf{Compacidad}: Una imagen se reduce de miles de píxeles a un histograma de dimensión $k$ (típicamente entre 100 y 1000), lo que facilita el entrenamiento de clasificadores.
+    \item \textbf{Simplicidad conceptual}: La analogía con el texto es fácil de entender y extender.
+    \item \textbf{Buen rendimiento}: En su época, BoW logró resultados competitivos en benchmarks como Caltech-101.
+\end{itemize}
+
+\subsection{Clasificador empleado: Máquina de Vectores Soporte (SVM)}
+Una vez que tenemos los histogramas, necesitamos un clasificador que aprenda a separar las distintas categorías. Utilizaremos una \textbf{Máquina de Vectores Soporte} con kernel lineal. El SVM busca el hiperplano que maximiza el margen entre las clases. Es especialmente eficaz cuando el número de características es moderado (nuestro $k$) y hay un número suficiente de ejemplos. La elección del kernel lineal evita la complejidad de kernels no lineales y suele funcionar bien para histogramas normalizados.
+
+\subsection{Métricas de evaluación}
+Para medir el rendimiento del clasificador usaremos dos herramientas estándar:
+\begin{itemize}
+    \item \textbf{Accuracy} (exactitud): Proporción de aciertos global. Se define como $\frac{TP + TN}{TP+TN+FP+FN}$, aunque en clasificación multiclase se calcula como el número de predicciones correctas dividido entre el total. Es una medida intuitiva pero puede ser engañosa si las clases están desbalanceadas.
+    \item \textbf{Matriz de confusión}: Una tabla de tamaño $C \times C$ (donde $C$ es el número de clases) donde la entrada $(i,j)$ indica cuántas muestras de la clase real $i$ fueron clasificadas como clase $j$. Permite identificar confusiones específicas: por ejemplo, que muchos aviones sean etiquetados como pájaros, o que los coches y las motos se confundan entre sí.
+\end{itemize}
+
+
+
+\section{Desarrollo}
+\begin{large}
+\textbf{Ejercicio: Implementación del modelo de bolsa de palabras (BoVW) y comparar resultados.} 
+\end{large}
+\\\\
+Selecciona uno de los tres conjuntos de datos para la implementación del modelo variando la configuración de sus hiperparámetros. Se sugiere utilizar un subconjunto de \textbf{Caltech-101} (disponible en \texttt{torchvision}) con tres categorías:
+\begin{itemize}
+    \item \texttt{airplane} (avión).
+    \item \texttt{car\_side} (coche de perfil).
+    \item \texttt{motorbikes} (motocicletas).
+\end{itemize}
+Alternativamente, para probar con más clases o imágenes propias:
+\begin{itemize}
+    \item \textbf{CIFAR-10}: 10 clases de objetos pequeños (requiere redimensionar a $128\times128$).
+    \item \textbf{Oxford Flowers-102}: 102 tipos de flores.
+    \item \textbf{Dataset propio}: imágenes organizadas en carpetas por categoría.
+\end{itemize}
+\\\\
+
+\begin{enumerate}
+\item \textbf{El flujo de trabajo implementado en el script es el siguiente}:
+    \begin{enumerate}
+        \item Descargar y filtrar el dataset (3 clases, imágenes redimensionadas a $128\times128$).
+        \item Extraer descriptores SIFT de todas las imágenes.
+        \item Ejecutar k-means con $k$ clusters para obtener el vocabulario.
+        \item Para cada imagen, construir su histograma de palabras visuales (Mostrar 5 de cada agrupación).
+        \item Dividir el conjunto en entrenamiento (80\%) y prueba (20\%).
+        \item Entrenar un SVM lineal con los histogramas de entrenamiento utilizando búsqueda de hiperparámetros ($grid$ $search$).
+        \item Predecir las etiquetas del conjunto de prueba y calcular exactitud, comenta tus resultados.
+        \item Mostrar la matriz de confusión, comenta tus resultados.
+    \end{enumerate}
+
+  
+\item \textbf{Evaluación y comparación de resultados: }
+    \begin{enumerate}
+        \item \textbf{Variar el número de palabras visuales} ($k = 50, 200, 500$). ¿Cómo afecta la exactitud y el tiempo de cómputo?
+        \item \textbf{Cambiar el clasificador}: sustituir SVM por Random Forest  y comparar resultados.
+        \item \textbf{Agregar validación cruzada}: hacer validación cruzada con 5 particiones e informar la media y desviación estándar de la exactitud.
+
+    \end{enumerate}
+
+\item \textbf{Opcional}
+    \begin{enumerate}
+        \item \textbf{Utilizar una base de datos diferente}y repetir la implementación del modelo adaptando la carga de datos.      
+    \end{enumerate}
+
+\item \textbf{Preguntas:}
+
+    \begin{itemize}
+        \item ¿Por qué es necesario normalizar los histogramas?
+        \item ¿Qué ocurre si $k$ es demasiado pequeño? ¿y si es demasiado grande?
+        \item ¿Podría utilizarse este método para detección de objetos en lugar de clasificación?
+    \end{itemize}
+
+\end{enumerate}
+
+\bigskip
+
+
+\section{Código}
+En esta sección deberás presentar el código fuente del programa que hayas escrito.
+\section{Conclusiones}
+En esta sección deberás escribir las conclusiones a las que hayas llegado una vez terminada la práctica.
+\section{Referencias}
+
+    \begin{itemize}
+    \item D. G. Lowe, "Distinctive image features from scale-invariant keypoints", IJCV 2004.
+    \item G. Csurka et al., "Visual categorization with bags of keypoints", ECCV 2004.
+    \item Scikit-learn documentation: \url{https://scikit-learn.org}
+    \item OpenCV Python tutorials: \url{https://docs.opencv.org}
+        
+        
+    \end{itemize}
+
+\end{enumerate}
+
+
+\end{document}
+
+
+
