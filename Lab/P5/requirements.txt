@@ -1,0 +1,21 @@
+# Practica 5: Agrupamiento y Clasificacion (Bag of Visual Words)
+# Probado con Python 3.14.3
+#
+# Instalacion (recomendado en un entorno virtual):
+#   python3 -m venv .venv
+#   source .venv/bin/activate        # en Windows: .venv\Scripts\activate
+#   pip install -r requirements.txt
+#
+# Luego abre el notebook y selecciona este entorno como kernel.
+
+# --- Dependencias del codigo ---
+numpy==2.4.4
+scipy==1.17.1
+scikit-learn==1.8.0
+matplotlib==3.10.9
+seaborn==0.13.2
+opencv-contrib-python==4.13.0.92   # provee SIFT (cv2.SIFT_create)
+
+# --- Para ejecutar el notebook ---
+jupyterlab==4.5.7
+ipykernel==7.2.0

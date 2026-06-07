@@ -1,0 +1,4 @@
+# Dataset descargado/extraido por el notebook (se regenera al ejecutar la celda 1.1)
+data/
+.DS_Store
+.ipynb_checkpoints/
